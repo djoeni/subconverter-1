@@ -3,10 +3,6 @@
 #include <numeric>
 #include <cmath>
 #include <climits>
-#include <rapidjson/writer.h>
-#include <rapidjson/document.h>
-#include <rapidjson/error/en.h>
-#include <yaml-cpp/yaml.h>
 
 #include "../../config/regmatch.h"
 #include "../../generator/config/subexport.h"
@@ -295,7 +291,7 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
         case ProxyType::VMess:
             singleproxy["type"] = "vmess";
             singleproxy["uuid"] = x.UserId;
-            singleproxy["alterId"] = static_cast<uint32_t>(x.AlterId);
+            singleproxy["alterId"] = singleproxy["alterId"] = x.AlterId;
             singleproxy["cipher"] = x.EncryptMethod;
             singleproxy["tls"] = x.TLSSecure;
             if (!x.Sni.empty())
@@ -354,9 +350,9 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
             singleproxy["type"] = "vless";
             singleproxy["uuid"] = x.UserId;
             singleproxy["tls"] = x.TLSSecure;
-	    if(!x.Host.empty())
+        if(!x.Host.empty())
                 singleproxy["servername"] = x.Host;
-	    if (!x.Flow.empty())
+        if (!x.Flow.empty())
                 singleproxy["flow"] = x.Flow;
             if(!scv.is_undef())
                 singleproxy["skip-cert-verify"] = scv.get();
@@ -469,13 +465,13 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
             singleproxy["password"] = x.Password;
             if (!x.Flow.empty())
                 singleproxy["flow"] = x.Flow;
-	    if(!x.Host.empty())
+        if(!x.Host.empty())
                 singleproxy["sni"] = x.Host;
             if(!scv.is_undef())
                 singleproxy["skip-cert-verify"] = scv.get();
             
-	    switch(hash_(x.TransferProtocol))
-	    {
+        switch(hash_(x.TransferProtocol))
+        {
             case "tcp"_hash:
                 break;
             case "grpc"_hash:
@@ -484,15 +480,17 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
                 singleproxy["grpc-opts"]["grpc-service-name"] = x.GRPCServiceName;
                 break;
             case "ws"_hash:
-		singleproxy["network"] = x.TransferProtocol;
+        singleproxy["network"] = x.TransferProtocol;
                 singleproxy["ws-opts"]["path"] = x.Path;
                 singleproxy["ws-opts"]["headers"]["Host"] = x.Host;
                 break;
-			}
+            }
             break;
         case ProxyType::Snell:
             singleproxy["type"] = "snell";
             singleproxy["psk"] = x.Password;
+            if(x.AlterId != 0)
+                singleproxy["version"] = x.AlterId;
             if(!x.OBFS.empty())
             {
                 singleproxy["obfs-opts"]["mode"] = x.OBFS;

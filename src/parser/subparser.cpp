@@ -74,7 +74,7 @@ void vlessConstruct(Proxy &node, const std::string &group, const std::string &re
     node.EncryptMethod = cipher;
     node.TransferProtocol = net.empty() ? "tcp" : type=="http" ? "http": net;
     node.Edge = edge;
-	node.Flow = flow;
+    node.Flow = flow;
     node.FakeType = type;
     node.TLSSecure = tls == "tls" || tls == "xtls";
 
@@ -139,17 +139,18 @@ void trojanConstruct(Proxy &node, const std::string &group, const std::string &r
     node.TLSSecure = tls == "tls" || tls == "xtls";
     node.TransferProtocol = network.empty() ? "tcp" : network;
     node.Path = path;
-	node.Flow = flow;
-	node.GRPCMode = mode.empty() ? "gun" : mode;
-	node.GRPCServiceName = path.empty() ? "/" : urlEncode(urlDecode(trim(path)));
+    node.Flow = flow;
+    node.GRPCMode = mode.empty() ? "gun" : mode;
+    node.GRPCServiceName = path.empty() ? "/" : urlEncode(urlDecode(trim(path)));
 }
 
-void snellConstruct(Proxy &node, const std::string &group, const std::string &remarks, const std::string &server, const std::string &port, const std::string &password, const std::string &obfs, const std::string &host, tribool udp, tribool tfo, tribool scv)
+void snellConstruct(Proxy &node, const std::string &group, const std::string &remarks, const std::string &server, const std::string &port, const std::string &password, const std::string &obfs, const std::string &host, uint16_t version, tribool udp, tribool tfo, tribool scv)
 {
     commonConstruct(node, ProxyType::Snell, group, remarks, server, port, udp, tfo, scv, tribool());
     node.Password = password;
     node.OBFS = obfs;
     node.Host = host;
+    node.AlterId = version;
 }
 
 void explodeVless(std::string vless, Proxy &node)
@@ -188,7 +189,7 @@ void explodeVmess(std::string vmess, Proxy &node)
         return;
     }
     jsondata.Parse(vmess.data());
-    if(jsondata.HasParseError())
+    if(jsondata.HasParseError() || !jsondata.IsObject())
         return;
 
     version = "1"; //link without version will treat as version 1
@@ -248,7 +249,7 @@ void explodeVmessConf(std::string content, std::vector<Proxy> &nodes)
     regGetMatch(content, "((?1)wssettings)", 2, 0, &wsset);
 
     json.Parse(content.data());
-    if(json.HasParseError())
+    if(json.HasParseError() || !json.IsObject())
         return;
     try
     {
@@ -434,7 +435,7 @@ void explodeSSD(std::string link, std::vector<Proxy> &nodes)
 
     link = urlSafeBase64Decode(link.substr(6));
     jsondata.Parse(link.c_str());
-    if(jsondata.HasParseError())
+    if(jsondata.HasParseError() || !jsondata.IsObject())
         return;
     if(!jsondata.HasMember("servers"))
         return;
@@ -547,7 +548,7 @@ void explodeSSConf(std::string content, std::vector<Proxy> &nodes)
     int index = nodes.size();
 
     json.Parse(content.data());
-    if(json.HasParseError())
+    if(json.HasParseError() || !json.IsObject())
         return;
     const char *section = json.HasMember("version") && json.HasMember("servers") ? "servers" : "configs";
     if(!json.HasMember(section))
@@ -783,8 +784,8 @@ void explodeTrojan(std::string trojan, Proxy &node)
 
     if(pos != trojan.npos)
     {
-		remark = urlDecode(trojan.substr(pos + 1));
-		trojan.erase(pos);
+        remark = urlDecode(trojan.substr(pos + 1));
+        trojan.erase(pos);
     }
     pos = trojan.find("?");
     if(pos != trojan.npos)
@@ -793,34 +794,34 @@ void explodeTrojan(std::string trojan, Proxy &node)
         trojan.erase(pos);
     }
 
-	if(regGetMatch(trojan, "(.*?)@(.*):(.*)", 4, 0, &psk, &server, &port))
-		return;
-	if(port == "0")
-		return;
-	
-	host = getUrlArg(addition, strFind(addition,"sni") ? "sni" : strFind(addition,"host") ? "host" : "peer");
-	tfo = getUrlArg(addition, "tfo");
-	scv = getUrlArg(addition, "allowInsecure");
-	group = urlDecode(getUrlArg(addition, "group"));
-	tls = getUrlArg(addition,"security");
-	flow = getUrlArg(addition,"flow");
-	
-	//Case WS
-	if(getUrlArg(addition, "type") == "ws")
+    if(regGetMatch(trojan, "(.*?)@(.*):(.*)", 4, 0, &psk, &server, &port))
+        return;
+    if(port == "0")
+        return;
+    
+    host = getUrlArg(addition, strFind(addition,"sni") ? "sni" : strFind(addition,"host") ? "host" : "peer");
+    tfo = getUrlArg(addition, "tfo");
+    scv = getUrlArg(addition, "allowInsecure");
+    group = urlDecode(getUrlArg(addition, "group"));
+    tls = getUrlArg(addition,"security");
+    flow = getUrlArg(addition,"flow");
+    
+    //Case WS
+    if(getUrlArg(addition, "type") == "ws")
     {
-		path = urlDecode(getUrlArg(addition, "path"));
-		network = "ws";
+        path = urlDecode(getUrlArg(addition, "path"));
+        network = "ws";
     }
-	//Case GRPC
-	if(getUrlArg(addition, "type") == "grpc")
+    //Case GRPC
+    if(getUrlArg(addition, "type") == "grpc")
     {
-		mode = getUrlArg(addition,"mode");
-		path = getUrlArg(addition, "serviceName");
-		network = "grpc";
+        mode = getUrlArg(addition,"mode");
+        path = getUrlArg(addition, "serviceName");
+        network = "grpc";
     }
-	
-	if(remark.empty())
-		remark = server + ":" + port;
+    
+    if(remark.empty())
+        remark = server + ":" + port;
 
     if(group.empty())
         group = TROJAN_DEFAULT_GROUP;
@@ -988,9 +989,10 @@ void explodeNetch(std::string netch, Proxy &node)
     case "Snell"_hash:
         obfs = GetMember(json, "OBFS");
         host = GetMember(json, "Host");
+        aid = GetMember(json, "AlterId");
         if(group.empty())
             group = SNELL_DEFAULT_GROUP;
-        snellConstruct(node, group, remark, address, port, password, obfs, host, udp, tfo, scv);
+        snellConstruct(node, group, remark, address, port, password, obfs, host, to_int(aid, 0), udp, tfo, scv);
         break;
     default:
         return;
@@ -1003,9 +1005,9 @@ void explodeClash(Node yamlnode, std::vector<Proxy> &nodes)
     std::string type = "none", id, aid = "0", net = "tcp", sni, alpn, path, host, edge, tls; //vmess
     std::string plugin, pluginopts, pluginopts_mode, pluginopts_host, pluginopts_mux; //ss
     std::string protocol, protoparam, obfs, obfsparam; //ssr
-	std::string user; //socks
-	std::string flow, mode;
-	tribool udp, tfo, scv;
+    std::string user; //socks
+    std::string flow, mode;
+    tribool udp, tfo, scv;
     Proxy node;
     Node singleproxy;
     uint32_t index = nodes.size();
@@ -1178,12 +1180,12 @@ void explodeClash(Node yamlnode, std::vector<Proxy> &nodes)
             singleproxy["password"] >>= password;
             singleproxy["sni"] >>= host;
             singleproxy["network"] >>= net;
-			singleproxy["flow"] >>= flow;
+            singleproxy["flow"] >>= flow;
             switch(hash_(net))
             {
             case "grpc"_hash:
-				singleproxy["grpc-opts"]["grpc-mode"] >>= mode;
-				singleproxy["grpc-opts"]["grpc-service-name"] >>= path;
+                singleproxy["grpc-opts"]["grpc-mode"] >>= mode;
+                singleproxy["grpc-opts"]["grpc-service-name"] >>= path;
                 break;
             case "ws"_hash:
                 singleproxy["ws-opts"]["path"] >>= path;
@@ -1201,8 +1203,9 @@ void explodeClash(Node yamlnode, std::vector<Proxy> &nodes)
             singleproxy["psk"] >> password;
             singleproxy["obfs-opts"]["mode"] >>= obfs;
             singleproxy["obfs-opts"]["host"] >>= host;
+            singleproxy["version"] >>= aid;
 
-            snellConstruct(node, group, ps, server, port, password, obfs, host, udp, tfo, scv);
+            snellConstruct(node, group, ps, server, port, password, obfs, host, to_int(aid, 0), udp, tfo, scv);
             break;
         default:
             continue;
@@ -1232,11 +1235,11 @@ void explodeStdVMess(std::string vmess, Proxy &node)
     const std::string stdvmess_matcher = R"(^([a-z]+)(?:\+([a-z]+))?:([\da-f]{4}(?:[\da-f]{4}-){4}[\da-f]{12})-(\d+)@(.+):(\d+)(?:\/?\?(.*))?$)";
     if(regGetMatch(vmess, stdvmess_matcher, 8, 0, &net, &tls, &id, &aid, &add, &port, &addition))
         return;
-	
-	sni = getUrlArg(addition, "servername");
-	
-	switch(hash_(net))
-	{
+    
+    sni = getUrlArg(addition, "servername");
+    
+    switch(hash_(net))
+    {
     case "tcp"_hash:
     case "kcp"_hash:
         type = getUrlArg(addition, "type");
@@ -1278,22 +1281,22 @@ void explodeStdVless(std::string vless, Proxy &node)
     const std::string stdvless_matcher = R"(^([\da-f]{4}(?:[\da-f]{4}-){4}[\da-f]{12})@(.+):(\d+)(?:\/?\?(.*))?$)";
     if(regGetMatch(vless, stdvless_matcher, 5, 0, &id, &add, &port, &addition))
         return;
-	
-	tls = getUrlArg(addition,"security");
-	net = getUrlArg(addition,"type");
-	flow = getUrlArg(addition,"flow");
-	
-	switch(hash_(net))
-	{
+    
+    tls = getUrlArg(addition,"security");
+    net = getUrlArg(addition,"type");
+    flow = getUrlArg(addition,"flow");
+    
+    switch(hash_(net))
+    {
         case "tcp"_hash:
         case "ws"_hash:
         case "h2"_hash:
-			type = getUrlArg(addition, "headerType");
-			host = getUrlArg(addition, strFind(addition,"sni") ? "sni" : "host");
-			path = getUrlArg(addition, "path");
-			break;
+            type = getUrlArg(addition, "headerType");
+            host = getUrlArg(addition, strFind(addition,"sni") ? "sni" : "host");
+            path = getUrlArg(addition, "path");
+            break;
         case "grpc"_hash:
-			host = getUrlArg(addition, "sni");
+            host = getUrlArg(addition, "sni");
             path = getUrlArg(addition, "serviceName");
             mode = getUrlArg(addition, "mode");
             break;
@@ -1431,6 +1434,7 @@ bool explodeSurge(std::string surge, std::vector<Proxy> &nodes)
         std::string plugin, pluginopts, pluginopts_mode, pluginopts_host, mod_url, mod_md5; //ss
         std::string id, net, tls, host, edge, path, sni, alpn; //v2
         std::string protocol, protoparam; //ssr
+        std::string version;
         std::string itemName, itemVal, config;
         std::vector<std::string> configs, vArray, headers, header;
         tribool udp, tfo, scv, tls13;
@@ -1759,6 +1763,9 @@ bool explodeSurge(std::string surge, std::vector<Proxy> &nodes)
                 case "skip-cert-verify"_hash:
                     scv = itemVal;
                     break;
+                case "version"_hash:
+                    version = itemVal;
+                    break;
                 default:
                     continue;
                 }
@@ -1766,7 +1773,7 @@ bool explodeSurge(std::string surge, std::vector<Proxy> &nodes)
             if(host.empty() && !isIPv4(server) && !isIPv6(server))
                 host = server;
 
-            snellConstruct(node, SNELL_DEFAULT_GROUP, remarks, server, port, password, plugin, host, udp, tfo, scv);
+            snellConstruct(node, SNELL_DEFAULT_GROUP, remarks, server, port, password, plugin, host, to_int(version, 0), udp, tfo, scv);
             break;
         default:
             switch(hash_(remarks))
@@ -2069,7 +2076,7 @@ void explodeSSTap(std::string sstap, std::vector<Proxy> &nodes)
     Proxy node;
     uint32_t index = nodes.size();
     json.Parse(sstap.data());
-    if(json.HasParseError())
+    if(json.HasParseError() || !json.IsObject())
         return;
 
     for(uint32_t i = 0; i < json["configs"].Size(); i++)
@@ -2125,7 +2132,7 @@ void explodeNetchConf(std::string netch, std::vector<Proxy> &nodes)
     uint32_t index = nodes.size();
 
     json.Parse(netch.data());
-    if(json.HasParseError())
+    if(json.HasParseError() || !json.IsObject())
         return;
 
     if(!json.HasMember("Server"))

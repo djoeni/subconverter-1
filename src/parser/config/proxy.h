@@ -68,7 +68,7 @@ struct Proxy
     String OBFS;
     String OBFSParam;
     String UserId;
-    uint8_t AlterId = 0;
+    uint16_t AlterId = 0;
     String TransferProtocol;
     String FakeType;
     bool TLSSecure = false;
