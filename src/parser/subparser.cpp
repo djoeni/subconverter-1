@@ -796,7 +796,9 @@ void explodeTrojan(std::string trojan, Proxy &node)
     if(port == "0")
         return;
     
-    host = getUrlArg(addition, strFind(addition,"sni") ? "sni" : strFind(addition,"host") ? "host" : "peer");
+    host = getUrlArg(addition, "sni");
+    if(host.empty())
+        host = getUrlArg(addition, "peer");
     tfo = getUrlArg(addition, "tfo");
     scv = getUrlArg(addition, "allowInsecure");
     group = urlDecode(getUrlArg(addition, "group"));
